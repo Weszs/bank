@@ -17,10 +17,13 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from django.urls import path, include
+from bank.views import save_user_info  # Import the view
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path("polls/", include("polls.urls")),
     path("admin/", admin.site.urls),
     path("bank/", include("bank.urls")),
+    path("api/", include("api.urls")),
+    path('api/save-user-info/', save_user_info, name='save_user_info'),
 ]

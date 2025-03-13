@@ -16,3 +16,10 @@ def add_record(request):
         print(f"Received: {name}, {address}")
         return JsonResponse({"message": "Data received successfully!"})
     return JsonResponse({"error": "Invalid request"}, status=400)
+
+def save_user_info(request):
+    if request.method == 'POST':
+        # Process the request data
+        return JsonResponse({"message": "User info saved successfully"})
+    else:
+        return JsonResponse({"error": "Only POST requests are allowed"}, status=405)
