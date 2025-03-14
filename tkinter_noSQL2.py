@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, simpledialog
 import mysql.connector
 
 # Database connection
@@ -99,13 +99,64 @@ def display_accounts():
     cursor.close()
     conn.close()
 
-# Placeholder functions
+# Function to refresh the account grid
+def refresh_accounts():
+    for row in grid_frame.get_children():
+        grid_frame.delete(row)
+    display_accounts()
+
+# Create Account Function
 def create_account():
-    messagebox.showinfo("Create Account", "Feature not implemented yet")
+    account_holder = simpledialog.askstring("Create Account", "Enter Account Holder Name:")
+    if account_holder:
+        initial_balance = simpledialog.askfloat("Create Account", "Enter Initial Balance:")
+        if initial_balance is not None:
+            conn = connect_db()
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO account_data (account_holder, balance) VALUES (%s, %s)", (account_holder, initial_balance))
+            conn.commit()
+            cursor.close()
+            conn.close()
+            refresh_accounts()
+            messagebox.showinfo("Success", "Account created successfully!")
+
+# Delete Account Function
 def delete_account():
-    messagebox.showinfo("Delete Account", "Feature not implemented yet")
+    selected_item = grid_frame.selection()
+    if selected_item:
+        account_id = grid_frame.item(selected_item, "values")[0]
+        confirm = messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this account?")
+        if confirm:
+            conn = connect_db()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM account_data WHERE id=%s", (account_id,))
+            conn.commit()
+            cursor.close()
+            conn.close()
+            refresh_accounts()
+            messagebox.showinfo("Success", "Account deleted successfully!")
+    else:
+        messagebox.showwarning("No Selection", "Please select an account to delete.")
+
+# Edit Account Function
 def edit_account():
-    messagebox.showinfo("Edit Account", "Feature not implemented yet")
+    selected_item = grid_frame.selection()
+    if selected_item:
+        account_id = grid_frame.item(selected_item, "values")[0]
+        new_balance = simpledialog.askfloat("Edit Account", "Enter New Balance:")
+        if new_balance is not None:
+            conn = connect_db()
+            cursor = conn.cursor()
+            cursor.execute("UPDATE account_data SET balance=%s WHERE id=%s", (new_balance, account_id))
+            conn.commit()
+            cursor.close()
+            conn.close()
+            refresh_accounts()
+            messagebox.showinfo("Success", "Account updated successfully!")
+    else:
+        messagebox.showwarning("No Selection", "Please select an account to edit.")
+
+# Placeholder functions for other actions
 def transfer():
     messagebox.showinfo("Transfer", "Feature not implemented yet")
 def withdraw():
