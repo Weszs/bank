@@ -35,7 +35,7 @@ def login():
 # Tkinter window
 root = tk.Tk()
 root.title("Banking App")
-root.geometry("800x500")
+root.geometry("1000x600")
 
 # Login Frame
 login_frame = tk.Frame(root)
@@ -78,21 +78,25 @@ grid_frame = ttk.Treeview(root)
 def display_accounts():
     global grid_frame
     grid_frame.pack(pady=20)
-    grid_frame["columns"] = ("ID", "Account Holder", "Balance")
+    grid_frame["columns"] = ("ID", "First Name", "Last Name", "Address", "Balance")
 
     grid_frame.column("#0", width=0, stretch=tk.NO)
-    grid_frame.column("ID", anchor=tk.W, width=100)
-    grid_frame.column("Account Holder", anchor=tk.W, width=200)
-    grid_frame.column("Balance", anchor=tk.W, width=150)
+    grid_frame.column("ID", anchor=tk.W, width=50)
+    grid_frame.column("First Name", anchor=tk.W, width=150)
+    grid_frame.column("Last Name", anchor=tk.W, width=150)
+    grid_frame.column("Address", anchor=tk.W, width=250)
+    grid_frame.column("Balance", anchor=tk.W, width=100)
 
     grid_frame.heading("#0", text="", anchor=tk.W)
     grid_frame.heading("ID", text="ID", anchor=tk.W)
-    grid_frame.heading("Account Holder", text="Account Holder", anchor=tk.W)
+    grid_frame.heading("First Name", text="First Name", anchor=tk.W)
+    grid_frame.heading("Last Name", text="Last Name", anchor=tk.W)
+    grid_frame.heading("Address", text="Address", anchor=tk.W)
     grid_frame.heading("Balance", text="Balance", anchor=tk.W)
 
     conn = connect_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, account_holder, balance FROM account_data")
+    cursor.execute("SELECT id, first_name, last_name, address, balance FROM account_data")
     for row in cursor.fetchall():
         grid_frame.insert("", tk.END, values=row)
 
@@ -107,18 +111,30 @@ def refresh_accounts():
 
 # Create Account Function
 def create_account():
-    account_holder = simpledialog.askstring("Create Account", "Enter Account Holder Name:")
-    if account_holder:
-        initial_balance = simpledialog.askfloat("Create Account", "Enter Initial Balance:")
-        if initial_balance is not None:
-            conn = connect_db()
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO account_data (account_holder, balance) VALUES (%s, %s)", (account_holder, initial_balance))
-            conn.commit()
-            cursor.close()
-            conn.close()
-            refresh_accounts()
-            messagebox.showinfo("Success", "Account created successfully!")
+    first_name = simpledialog.askstring("Create Account", "Enter First Name:")
+    if first_name:
+        last_name = simpledialog.askstring("Create Account", "Enter Last Name:")
+        if last_name:
+            address = simpledialog.askstring("Create Account", "Enter Address:")
+            if address:
+                initial_balance = simpledialog.askfloat("Create Account", "Enter Initial Balance:")
+                if initial_balance is not None:
+                    try:
+                        conn = connect_db()
+                        cursor = conn.cursor()
+                        cursor.execute(
+                            "INSERT INTO account_data (first_name, last_name, address, balance) VALUES (%s, %s, %s, %s)",
+                            (first_name, last_name, address, initial_balance)
+                        )
+                        conn.commit()
+                        messagebox.showinfo("Success", "Account created successfully!")
+                    except mysql.connector.Error as err:
+                        messagebox.showerror("Database Error", f"An error occurred: {err}")
+                    finally:
+                        if conn.is_connected():
+                            cursor.close()
+                            conn.close()
+                        refresh_accounts()
 
 # Delete Account Function
 def delete_account():
@@ -127,14 +143,19 @@ def delete_account():
         account_id = grid_frame.item(selected_item, "values")[0]
         confirm = messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this account?")
         if confirm:
-            conn = connect_db()
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM account_data WHERE id=%s", (account_id,))
-            conn.commit()
-            cursor.close()
-            conn.close()
-            refresh_accounts()
-            messagebox.showinfo("Success", "Account deleted successfully!")
+            try:
+                conn = connect_db()
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM account_data WHERE id=%s", (account_id,))
+                conn.commit()
+                messagebox.showinfo("Success", "Account deleted successfully!")
+            except mysql.connector.Error as err:
+                messagebox.showerror("Database Error", f"An error occurred: {err}")
+            finally:
+                if conn.is_connected():
+                    cursor.close()
+                    conn.close()
+                refresh_accounts()
     else:
         messagebox.showwarning("No Selection", "Please select an account to delete.")
 
@@ -143,26 +164,124 @@ def edit_account():
     selected_item = grid_frame.selection()
     if selected_item:
         account_id = grid_frame.item(selected_item, "values")[0]
-        new_balance = simpledialog.askfloat("Edit Account", "Enter New Balance:")
-        if new_balance is not None:
-            conn = connect_db()
-            cursor = conn.cursor()
-            cursor.execute("UPDATE account_data SET balance=%s WHERE id=%s", (new_balance, account_id))
-            conn.commit()
-            cursor.close()
-            conn.close()
-            refresh_accounts()
-            messagebox.showinfo("Success", "Account updated successfully!")
+        first_name = simpledialog.askstring("Edit Account", "Enter New First Name:")
+        if first_name:
+            last_name = simpledialog.askstring("Edit Account", "Enter New Last Name:")
+            if last_name:
+                address = simpledialog.askstring("Edit Account", "Enter New Address:")
+                if address:
+                    new_balance = simpledialog.askfloat("Edit Account", "Enter New Balance:")
+                    if new_balance is not None:
+                        try:
+                            conn = connect_db()
+                            cursor = conn.cursor()
+                            cursor.execute(
+                                "UPDATE account_data SET first_name=%s, last_name=%s, address=%s, balance=%s WHERE id=%s",
+                                (first_name, last_name, address, new_balance, account_id)
+                            )
+                            conn.commit()
+                            messagebox.showinfo("Success", "Account updated successfully!")
+                        except mysql.connector.Error as err:
+                            messagebox.showerror("Database Error", f"An error occurred: {err}")
+                        finally:
+                            if conn.is_connected():
+                                cursor.close()
+                                conn.close()
+                            refresh_accounts()
     else:
         messagebox.showwarning("No Selection", "Please select an account to edit.")
 
-# Placeholder functions for other actions
-def transfer():
-    messagebox.showinfo("Transfer", "Feature not implemented yet")
-def withdraw():
-    messagebox.showinfo("Withdraw", "Feature not implemented yet")
+# Deposit Function
 def deposit():
-    messagebox.showinfo("Deposit", "Feature not implemented yet")
+    selected_item = grid_frame.selection()
+    if selected_item:
+        account_id = grid_frame.item(selected_item, "values")[0]
+        amount = simpledialog.askfloat("Deposit", "Enter Amount to Deposit:")
+        if amount is not None and amount > 0:
+            try:
+                conn = connect_db()
+                cursor = conn.cursor()
+                cursor.execute("UPDATE account_data SET balance = balance + %s WHERE id=%s", (amount, account_id))
+                conn.commit()
+                messagebox.showinfo("Success", f"Deposited ${amount:.2f} successfully!")
+            except mysql.connector.Error as err:
+                messagebox.showerror("Database Error", f"An error occurred: {err}")
+            finally:
+                if conn.is_connected():
+                    cursor.close()
+                    conn.close()
+                refresh_accounts()
+    else:
+        messagebox.showwarning("No Selection", "Please select an account to deposit into.")
+
+# Withdraw Function
+def withdraw():
+    selected_item = grid_frame.selection()
+    if selected_item:
+        account_id = grid_frame.item(selected_item, "values")[0]
+        amount = simpledialog.askfloat("Withdraw", "Enter Amount to Withdraw:")
+        if amount is not None and amount > 0:
+            try:
+                conn = connect_db()
+                cursor = conn.cursor()
+                cursor.execute("SELECT balance FROM account_data WHERE id=%s", (account_id,))
+                balance = cursor.fetchone()[0]
+                if balance >= amount:
+                    cursor.execute("UPDATE account_data SET balance = balance - %s WHERE id=%s", (amount, account_id))
+                    conn.commit()
+                    messagebox.showinfo("Success", f"Withdrew ${amount:.2f} successfully!")
+                else:
+                    messagebox.showerror("Error", "Insufficient balance!")
+            except mysql.connector.Error as err:
+                messagebox.showerror("Database Error", f"An error occurred: {err}")
+            finally:
+                if conn.is_connected():
+                    cursor.close()
+                    conn.close()
+                refresh_accounts()
+    else:
+        messagebox.showwarning("No Selection", "Please select an account to withdraw from.")
+
+# Transfer Function
+def transfer():
+    selected_item = grid_frame.selection()
+    if selected_item:
+        from_account_id = grid_frame.item(selected_item, "values")[0]
+        to_account_id = simpledialog.askinteger("Transfer", "Enter Destination Account ID:")
+        if to_account_id:
+            amount = simpledialog.askfloat("Transfer", "Enter Amount to Transfer:")
+            if amount is not None and amount > 0:
+                try:
+                    conn = connect_db()
+                    cursor = conn.cursor()
+                    # Check if the destination account exists
+                    cursor.execute("SELECT id FROM account_data WHERE id=%s", (to_account_id,))
+                    if cursor.fetchone():
+                        # Check if the source account has sufficient balance
+                        cursor.execute("SELECT balance FROM account_data WHERE id=%s", (from_account_id,))
+                        balance = cursor.fetchone()[0]
+                        if balance >= amount:
+                            # Deduct from source account
+                            cursor.execute("UPDATE account_data SET balance = balance - %s WHERE id=%s", (amount, from_account_id))
+                            # Add to destination account
+                            cursor.execute("UPDATE account_data SET balance = balance + %s WHERE id=%s", (amount, to_account_id))
+                            conn.commit()
+                            messagebox.showinfo("Success", f"Transferred ${amount:.2f} successfully!")
+                        else:
+                            messagebox.showerror("Error", "Insufficient balance!")
+                    else:
+                        messagebox.showerror("Error", "Destination account does not exist!")
+                except mysql.connector.Error as err:
+                    messagebox.showerror("Database Error", f"An error occurred: {err}")
+                finally:
+                    if conn.is_connected():
+                        cursor.close()
+                        conn.close()
+                    refresh_accounts()
+    else:
+        messagebox.showwarning("No Selection", "Please select an account to transfer from.")
+
+# Placeholder function for View Transactions
 def view_transactions():
     messagebox.showinfo("View Transactions", "Feature not implemented yet")
 
