@@ -26,3 +26,5 @@ def save_user_info(request):
             return JsonResponse({"error": "Invalid JSON data"}, status=400)
     else:
         return JsonResponse({"error": "Invalid request method"}, status=405)
+    
+    

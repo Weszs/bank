@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 import mysql.connector
 from datetime import datetime
+from decimal import Decimal  # Import Decimal for precise arithmetic
 
 # Database connection
 def connect_db():
@@ -14,6 +15,7 @@ def connect_db():
 
 # Create transactions table (if it doesn't exist)
 def create_transactions_table():
+    conn = None
     try:
         conn = connect_db()
         cursor = conn.cursor()
@@ -24,6 +26,7 @@ def create_transactions_table():
                 destination_id INT NOT NULL,
                 amount DECIMAL(10, 2) NOT NULL,
                 transaction_date DATETIME NOT NULL,
+                balance_after_transaction DECIMAL(10, 2),
                 FOREIGN KEY (source_id) REFERENCES account_data(id),
                 FOREIGN KEY (destination_id) REFERENCES account_data(id)
             )
@@ -32,7 +35,7 @@ def create_transactions_table():
     except mysql.connector.Error as err:
         messagebox.showerror("Database Error", f"An error occurred: {err}")
     finally:
-        if conn.is_connected():
+        if conn and conn.is_connected():
             cursor.close()
             conn.close()
 
@@ -59,8 +62,8 @@ def login():
 
 # Tkinter window
 root = tk.Tk()
-root.title("Wesley, Dorser APP")
-root.geometry("300x200")
+root.title("77487, Dorser APP")
+root.geometry("600x500")
 
 # Login Frame
 login_frame = tk.Frame(root)
@@ -198,7 +201,6 @@ def edit_account():
                     try:
                         conn = connect_db()
                         cursor = conn.cursor()
-                        # Update only first_name, last_name, and address
                         cursor.execute(
                             "UPDATE account_data SET first_name=%s, last_name=%s, address=%s WHERE id=%s",
                             (first_name, last_name, address, account_id)
@@ -226,20 +228,15 @@ def deposit():
                 conn = connect_db()
                 cursor = conn.cursor()
 
-                # Fetch current balance
-                cursor.execute("SELECT balance FROM account_data WHERE id=%s", (account_id,))
-                balance = cursor.fetchone()[0]
-                new_balance = balance + amount
-
                 # Update balance
-                cursor.execute("UPDATE account_data SET balance = %s WHERE id=%s", (new_balance, account_id))
+                cursor.execute("UPDATE account_data SET balance = balance + %s WHERE id=%s", (amount, account_id))
 
                 # Record transaction
                 transaction_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 cursor.execute("""
                     INSERT INTO transactions (source_id, destination_id, amount, transaction_date, balance_after_transaction) 
                     VALUES (%s, %s, %s, %s, %s)
-                """, (account_id, account_id, amount, transaction_date, new_balance))
+                """, (account_id, account_id, amount, transaction_date, amount))
 
                 conn.commit()
                 messagebox.showinfo("Success", f"Deposited ${amount:.2f} successfully!")
@@ -250,6 +247,8 @@ def deposit():
                     cursor.close()
                     conn.close()
                 refresh_accounts()
+    else:
+        messagebox.showwarning("No Selection", "Please select an account to deposit into.")
 
 # Withdraw Function
 def withdraw():
@@ -266,18 +265,21 @@ def withdraw():
                 cursor.execute("SELECT balance FROM account_data WHERE id=%s", (account_id,))
                 balance = cursor.fetchone()[0]
 
-                if balance >= amount:
-                    new_balance = balance - amount
+                # Convert amount to Decimal
+                amount_decimal = Decimal(str(amount))
+
+                if balance >= amount_decimal:
+                    new_balance = balance - amount_decimal
 
                     # Update balance
-                    cursor.execute("UPDATE account_data SET balance = %s WHERE id=%s", (new_balance, account_id))
+                    cursor.execute("UPDATE account_data SET balance = %s WHERE id=%s", (float(new_balance), account_id))
 
                     # Record transaction
                     transaction_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     cursor.execute("""
                         INSERT INTO transactions (source_id, destination_id, amount, transaction_date, balance_after_transaction) 
                         VALUES (%s, %s, %s, %s, %s)
-                    """, (account_id, account_id, -amount, transaction_date, new_balance))
+                    """, (account_id, account_id, float(-amount_decimal), transaction_date, float(new_balance)))
 
                     conn.commit()
                     messagebox.showinfo("Success", f"Withdrew ${amount:.2f} successfully!")
@@ -290,7 +292,8 @@ def withdraw():
                     cursor.close()
                     conn.close()
                 refresh_accounts()
-
+    else:
+        messagebox.showwarning("No Selection", "Please select an account to withdraw from.")
 
 # Transfer Function
 def transfer():
@@ -311,23 +314,34 @@ def transfer():
                         # Check if the source account has sufficient balance
                         cursor.execute("SELECT balance FROM account_data WHERE id=%s", (source_id,))
                         source_balance = cursor.fetchone()[0]
-                        if source_balance >= amount:
+
+                        # Convert amount to Decimal
+                        amount_decimal = Decimal(str(amount))
+
+                        if source_balance >= amount_decimal:
                             # Deduct from source account
-                            cursor.execute("UPDATE account_data SET balance = balance - %s WHERE id=%s", (amount, source_id))
-                            source_balance_after = source_balance - amount
+                            source_balance_after = source_balance - amount_decimal
+                            cursor.execute("UPDATE account_data SET balance = %s WHERE id=%s", (float(source_balance_after), source_id))
 
                             # Add to destination account
                             cursor.execute("SELECT balance FROM account_data WHERE id=%s", (destination_id,))
                             destination_balance = cursor.fetchone()[0]
-                            cursor.execute("UPDATE account_data SET balance = balance + %s WHERE id=%s", (amount, destination_id))
-                            destination_balance_after = destination_balance + amount
+                            destination_balance_after = destination_balance + amount_decimal
+                            cursor.execute("UPDATE account_data SET balance = %s WHERE id=%s", (float(destination_balance_after), destination_id))
 
-                            # Record the transaction
+                            # Record the transaction for the source account (debit)
                             transaction_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                             cursor.execute(
                                 "INSERT INTO transactions (source_id, destination_id, amount, transaction_date, balance_after_transaction) VALUES (%s, %s, %s, %s, %s)",
-                                (source_id, destination_id, amount, transaction_date, source_balance_after)
+                                (source_id, destination_id, float(-amount_decimal), transaction_date, float(source_balance_after))
                             )
+
+                            # Record the transaction for the destination account (credit)
+                            cursor.execute(
+                                "INSERT INTO transactions (source_id, destination_id, amount, transaction_date, balance_after_transaction) VALUES (%s, %s, %s, %s, %s)",
+                                (source_id, destination_id, float(amount_decimal), transaction_date, float(destination_balance_after))
+                            )
+
                             conn.commit()
                             messagebox.showinfo("Success", f"Transferred ${amount:.2f} successfully!")
                         else:
@@ -395,13 +409,6 @@ def view_transactions():
                             transaction_type = "Withdrawal"
                     else:
                         transaction_type = "Transfer"
-
-                    # Check if balance_after is None and replace it with calculated value
-                    if balance_after is None:
-                        # Fetch the last known balance from account_data
-                        cursor.execute("SELECT balance FROM account_data WHERE id = %s", (source_id,))
-                        latest_balance = cursor.fetchone()
-                        balance_after = latest_balance[0] if latest_balance else "N/A"
 
                     # Insert the transaction into the Treeview
                     transaction_tree.insert("", tk.END, values=(transaction_type, source_id, destination_id, amount, transaction_date, balance_after))
